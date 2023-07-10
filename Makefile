@@ -78,8 +78,8 @@ comma := ,
 build_tags_comma_sep := $(subst $(whitespace),$(comma),$(build_tags))
 
 # process linker flags
-ldflags += -X github.com/cosmos/cosmos-sdk/version.Name=cronos \
-	-X github.com/cosmos/cosmos-sdk/version.AppName=cronosd \
+ldflags += -X github.com/cosmos/cosmos-sdk/version.Name=genesisd \
+	-X github.com/cosmos/cosmos-sdk/version.AppName=genesisd \
 	-X github.com/cosmos/cosmos-sdk/version.Version=$(VERSION) \
 	-X github.com/cosmos/cosmos-sdk/version.Commit=$(COMMIT) \
 	-X github.com/cosmos/cosmos-sdk/version.BuildTags=$(build_tags_comma_sep)
