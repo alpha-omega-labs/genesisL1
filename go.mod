@@ -206,7 +206,7 @@ require (
 replace (
 	// the version used by cockroach v22.2.7 release
 	github.com/cockroachdb/pebble => github.com/cockroachdb/pebble v0.0.0-20230206180212-744ea7cc8f90
-	github.com/cometbft/cometbft-db => github.com/crypto-org-chain/cometbft-db v0.0.0-20230412133340-ac70df4b45f6
+	github.com/cometbft/cometbft-db => github.com/alpha-omega-labs/cometbft-db v0.1-genesis
 	// Ref: https://forum.cosmos.network/t/ibc-security-advisory-dragonberry/7702
 	github.com/confio/ics23/go => github.com/confio/ics23/go v0.9.0
 	// https://github.com/crypto-org-chain/cosmos-sdk/tree/release/v0.46.12-hotfix
