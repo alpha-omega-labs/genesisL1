@@ -277,6 +277,32 @@ type ExportFeemarketParams struct {
 	EnableHeight int64 `json:"enable_height,string"`
 }
 
+// LastValidatorPower required for validator set update logic.
+type LastValidatorPower struct {
+	// address is the address of the validator.
+	Address string `json:"address"`
+	// power defines the power of the validator.
+	Power int64 `json:"power,string"`
+}
+
+type ExportStakingGenesisState struct {
+	stakingtypes.GenesisState
+	Params              ExportStakingParams      `json:"params"`
+	LastValidatorPowers []LastValidatorPower     `json:"last_validator_powers"`
+	Validators          []ExportStakingValidator `json:"validators"`
+}
+
+type ExportStakingParams struct {
+	stakingtypes.Params
+	UnbondingTime string `json:"unbonding_time"`
+}
+
+type ExportStakingValidator struct {
+	stakingtypes.Validator
+	Status          string `json:"status"`
+	UnbondingHeight int64  `json:"unbonding_height,string"`
+}
+
 func Migrate(appState genutiltypes.AppMap, clientCtx client.Context) genutiltypes.AppMap {
 	// Add feeibc with default genesis.
 	if appState[ibcfeetypes.ModuleName] == nil {
@@ -305,7 +331,7 @@ func Migrate(appState genutiltypes.AppMap, clientCtx client.Context) genutiltype
 	}
 	appState[feemarkettypes.ModuleName] = data
 
-	var stakingState stakingtypes.GenesisState
+	var stakingState ExportStakingGenesisState
 	err = json.Unmarshal(appState[stakingtypes.ModuleName], &stakingState)
 	if err != nil {
 		panic(err)
