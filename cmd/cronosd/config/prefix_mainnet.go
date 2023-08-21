@@ -7,7 +7,7 @@ import sdk "github.com/cosmos/cosmos-sdk/types"
 
 const (
 	// Bech32Prefix defines the Bech32 prefix used for Cronos Accounts
-	Bech32Prefix = "crc"
+	Bech32Prefix = "genesis"
 
 	// Bech32PrefixAccAddr defines the Bech32 prefix of an account's address
 	Bech32PrefixAccAddr = Bech32Prefix
