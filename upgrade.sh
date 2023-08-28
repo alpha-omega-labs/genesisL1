@@ -23,15 +23,6 @@ cat << "EOF"
                                                           /$$  \ $$                          
                                                          |  $$$$$$/                          
                                                           \______/                           
-                           /$$                 /$$                                           
-                          |__/                | $$                                           
-             /$$  /$$  /$$ /$$  /$$$$$$$  /$$$$$$$  /$$$$$$  /$$$$$$/$$$$                    
-            | $$ | $$ | $$| $$ /$$_____/ /$$__  $$ /$$__  $$| $$_  $$_  $$                   
-            | $$ | $$ | $$| $$|  $$$$$$ | $$  | $$| $$  \ $$| $$ \ $$ \ $$                   
-            | $$ | $$ | $$| $$ \____  $$| $$  | $$| $$  | $$| $$ | $$ | $$                   
-            |  $$$$$/$$$$/| $$ /$$$$$$$/|  $$$$$$$|  $$$$$$/| $$ | $$ | $$                   
-             \_____/\___/ |__/|_______/  \_______/ \______/ |__/ |__/ |__/                   
-
 																										   
 	Welcome to the decentralized blockchain Renaissance, above money & beyond cryptocurrency!
 	This script upgrading genesis_29-2 (evmos) to genesis_29-2 (cronos) running under root user.
@@ -186,10 +177,13 @@ genesisd tendermint unsafe-reset-all
 # sed -i '212s/.*/enable = false/' app.toml
 
 # SETTING genesisd AS A SYSTEMD SERVICE
-wget https://raw.githubusercontent.com/alpha-omega-labs/genesisd/noobdate/genesisd.service -O /etc/systemd/system/genesisd.service
+cd
+cd /etc/systemd/system
+rm -r genesis.service
+rm -r genesisd.service
+wget https://raw.githubusercontent.com/alpha-omega-labs/genesisL1/moonlight/genesisd.service
 systemctl daemon-reload
-systemctl enable genesisd
-# echo "All set!" 
+systemctl enable genesisd.service 
 sleep 3s
 
 # STARTING NODE
