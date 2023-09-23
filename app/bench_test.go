@@ -2,7 +2,7 @@ package app
 
 import (
 	"encoding/binary"
-	"encoding/json"
+	"github.com/goccy/go-json"
 	"math/big"
 	"testing"
 
