@@ -3,7 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
+	"github.com/goccy/go-json"
 	"fmt"
 	"math/rand"
 	"strconv"
