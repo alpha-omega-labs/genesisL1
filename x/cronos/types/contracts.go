@@ -4,7 +4,7 @@ import (
 	// embed compiled smart contract
 	_ "embed"
 	"encoding/hex"
-	"encoding/json"
+	"github.com/goccy/go-json"
 	"fmt"
 
 	authtypes "github.com/cosmos/cosmos-sdk/x/auth/types"
