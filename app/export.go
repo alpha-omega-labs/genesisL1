@@ -1,7 +1,7 @@
 package app
 
 import (
-	"encoding/json"
+	"github.com/goccy/go-json"
 	"log"
 
 	tmproto "github.com/tendermint/tendermint/proto/tendermint/types"
