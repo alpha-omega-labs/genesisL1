@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package biol1;
+
+import "google/api/annotations.proto";
+
+// The Biol1 query service
+service Query {
+  rpc GCContent(GCContentRequest) returns (GCContentResponse) {
+    option (google.api.http) = {
+      post: "/cronos/biol1/gc-content"
+      body: "*"
+    };
+  }
+}
+
+message GCContentRequest {
+  string sequence = 1;
+}
+
+message GCContentResponse {
+  double gc_content = 1;
+}
