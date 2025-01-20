@@ -143,6 +143,11 @@ import (
 
 	// force register the extension json-rpc.
 	_ "github.com/crypto-org-chain/cronos/x/cronos/rpc"
+
+	// [ADDED CODE]: Import new biol1 module
+	biol1 "github.com/crypto-org-chain/cronos/x/biol1"
+	biol1keeper "github.com/crypto-org-chain/cronos/x/biol1/keeper"
+	biol1types "github.com/crypto-org-chain/cronos/x/biol1/types"
 )
 
 const (
@@ -200,7 +205,6 @@ var (
 		cronostypes.ModuleName:         {authtypes.Minter, authtypes.Burner},
 	}
 	// Module configurator
-
 )
 
 var _ servertypes.Application = (*App)(nil)
@@ -329,6 +333,9 @@ type App struct {
 	// this line is used by starport scaffolding # stargate/app/keeperDeclaration
 
 	CronosKeeper cronoskeeper.Keeper
+
+	// [ADDED CODE]: Our new keeper
+	Biol1Keeper biol1keeper.Keeper
 
 	// the module manager
 	mm *module.Manager
@@ -479,7 +486,6 @@ func New(
 	// Create Ethermint keepers
 	tracer := cast.ToString(appOpts.Get(srvflags.EVMTracer))
 
-	// Create Ethermint keepers
 	app.FeeMarketKeeper = feemarketkeeper.NewKeeper(
 		appCodec, app.GetSubspace(feemarkettypes.ModuleName), keys[feemarkettypes.StoreKey], tkeys[feemarkettypes.TransientKey],
 	)
@@ -533,12 +539,7 @@ func New(
 		AddRoute(cronostypes.RouterKey, cronos.NewTokenMappingChangeProposalHandler(app.CronosKeeper))
 
 	govConfig := govtypes.DefaultConfig()
-	/*
-		Example of setting gov params:
-		govConfig.MaxMetadataLen = 10000
-	*/
 
-	// set the middleware
 	transferModule := transfer.NewAppModule(app.TransferKeeper)
 	feeModule := ibcfee.NewAppModule(app.IBCFeeKeeper)
 
@@ -567,7 +568,6 @@ func New(
 	))
 
 	// register the staking hooks
-	// NOTE: stakingKeeper above is passed by reference, so that it will contain these hooks
 	if experimental {
 		app.StakingKeeper = *stakingKeeper.SetHooks(
 			stakingtypes.NewMultiStakingHooks(
@@ -592,13 +592,7 @@ func New(
 	app.IBCKeeper.SetRouter(ibcRouter)
 
 	/****  Module Options ****/
-
-	// NOTE: we may consider parsing `appOpts` inside module constructors. For the moment
-	// we prefer to be more strict in what arguments the modules expect.
 	skipGenesisInvariants := cast.ToBool(appOpts.Get(crisis.FlagSkipGenesisInvariants))
-
-	// NOTE: Any module instantiated in the module manager that is later modified
-	// must be passed by reference here.
 
 	modules := []module.AppModule{
 		genutil.NewAppModule(
@@ -628,10 +622,22 @@ func New(
 		cronosModule,
 	}
 
-	// During begin block slashing happens after distr.BeginBlocker so that
-	// there is nothing left over in the validator fee pool, so as to keep the
-	// CanWithdrawInvariant invariant.
-	// NOTE: staking module is required if HistoricalEntries param > 0
+	// [ADDED CODE]: Create Biol1 keeper & module and add to the module manager
+	{
+		// Could read from appOpts if you want a CLI flag, else default:
+		sidecarURL := "http://127.0.0.1:8000" 
+		app.Biol1Keeper = biol1keeper.NewKeeper(sidecarURL)
+		biol1Module := biol1.NewAppModule(app.Biol1Keeper)
+		modules = append(modules, biol1Module)
+	}
+	// End [ADDED CODE]
+
+	if experimental {
+		modules = append(modules,
+			gravity.NewAppModule(app.GravityKeeper, app.BankKeeper),
+		)
+	}
+
 	beginBlockersOrder := []string{
 		upgradetypes.ModuleName,
 		capabilitytypes.ModuleName,
@@ -673,11 +679,6 @@ func New(
 		vestingtypes.ModuleName,
 		cronostypes.ModuleName,
 	}
-	// NOTE: The genutils module must occur after staking so that pools are
-	// properly initialized with tokens from genesis accounts.
-	// NOTE: Capability module must occur first so that it can initialize any capabilities
-	// so that other modules that want to create or claim capabilities afterwards in InitChain
-	// can do so safely.
 	initGenesisOrder := []string{
 		capabilitytypes.ModuleName,
 		authtypes.ModuleName,
@@ -689,10 +690,7 @@ func New(
 		minttypes.ModuleName,
 		crisistypes.ModuleName,
 		ibchost.ModuleName,
-		// evm module denomination is used by the feemarket module, in AnteHandle
 		evmtypes.ModuleName,
-		// NOTE: feemarket need to be initialized before genutil module:
-		// gentx transactions use MinGasPriceDecorator.AnteHandle
 		feemarkettypes.ModuleName,
 		genutiltypes.ModuleName,
 		evidencetypes.ModuleName,
@@ -720,39 +718,26 @@ func New(
 	app.mm.SetOrderEndBlockers(endBlockersOrder...)
 	app.mm.SetOrderInitGenesis(initGenesisOrder...)
 
-	// Uncomment if you want to set a custom migration order here.
-	// app.mm.SetOrderMigrations(custom order)
-
 	app.mm.RegisterInvariants(&app.CrisisKeeper)
 	app.mm.RegisterRoutes(app.Router(), app.QueryRouter(), encodingConfig.Amino)
 	app.configurator = module.NewConfigurator(app.appCodec, app.MsgServiceRouter(), app.GRPCQueryRouter())
 	app.mm.RegisterServices(app.configurator)
 
-	// RegisterUpgradeHandlers is used for registering any on-chain upgrades.
-	// Make sure it's called after `app.mm` and `app.configurator` are set.
 	app.RegisterUpgradeHandlers(experimental)
 
-	// add test gRPC service for testing gRPC queries in isolation
 	testdata.RegisterQueryServer(app.GRPCQueryRouter(), testdata.QueryImpl{})
 
-	// create the simulation manager and define the order of the modules for deterministic simulations
-	//
-	// NOTE: this is not required apps that don't use the simulator for fuzz testing
-	// transactions
 	overrideModules := map[string]module.AppModuleSimulation{
-		// Use custom RandomGenesisAccounts so that auth module could create random EthAccounts in genesis state when genesis.json not specified
 		authtypes.ModuleName: auth.NewAppModule(app.appCodec, app.AccountKeeper, ethermintapp.RandomGenesisAccounts),
 	}
 	app.sm = module.NewSimulationManagerFromAppModules(app.mm.Modules, overrideModules)
 
 	app.sm.RegisterStoreDecoders()
 
-	// initialize stores
 	app.MountKVStores(keys)
 	app.MountTransientStores(tkeys)
 	app.MountMemoryStores(memKeys)
 
-	// initialize BaseApp
 	app.SetInitChainer(app.InitChainer)
 	app.SetBeginBlocker(app.BeginBlocker)
 	app.SetEndBlocker(app.EndBlocker)
@@ -763,19 +748,6 @@ func New(
 		cast.ToStringSlice(appOpts.Get(FlagBlockedAddresses)),
 	)
 
-	// In v0.46, the SDK introduces _postHandlers_. PostHandlers are like
-	// antehandlers, but are run _after_ the `runMsgs` execution. They are also
-	// defined as a chain, and have the same signature as antehandlers.
-	//
-	// In baseapp, postHandlers are run in the same store branch as `runMsgs`,
-	// meaning that both `runMsgs` and `postHandler` state will be committed if
-	// both are successful, and both will be reverted if any of the two fails.
-	//
-	// The SDK exposes a default empty postHandlers chain.
-	//
-	// Please note that changing any of the anteHandler or postHandler chain is
-	// likely to be a state-machine breaking change, which needs a coordinated
-	// upgrade.
 	app.setPostHandler()
 
 	if loadLatest {
@@ -837,12 +809,10 @@ func (app *App) Name() string { return app.BaseApp.Name() }
 
 // BeginBlocker application updates every begin block
 func (app *App) BeginBlocker(ctx sdk.Context, req abci.RequestBeginBlock) abci.ResponseBeginBlock {
-	// backport: https://github.com/cosmos/cosmos-sdk/pull/16639
 	var halt bool
 	switch {
 	case app.haltHeight > 0 && uint64(req.Header.Height) > app.haltHeight:
 		halt = true
-
 	case app.haltTime > 0 && req.Header.Time.Unix() > int64(app.haltTime):
 		halt = true
 	}
@@ -884,22 +854,15 @@ func (app *App) ModuleAccountAddrs() map[string]bool {
 	for acc := range maccPerms {
 		modAccAddrs[authtypes.NewModuleAddress(acc).String()] = true
 	}
-
 	return modAccAddrs
 }
 
 // LegacyAmino returns SimApp's amino codec.
-//
-// NOTE: This is solely to be used for testing purposes as it may be desirable
-// for modules to register their own custom testing types.
 func (app *App) LegacyAmino() *codec.LegacyAmino {
 	return app.cdc
 }
 
 // AppCodec returns your app's codec.
-//
-// NOTE: This is solely to be used for testing purposes as it may be desirable
-// for modules to register their own custom testing types.
 func (app *App) AppCodec() codec.Codec {
 	return app.appCodec
 }
@@ -910,29 +873,21 @@ func (app *App) InterfaceRegistry() types.InterfaceRegistry {
 }
 
 // GetKey returns the KVStoreKey for the provided store key.
-//
-// NOTE: This is solely to be used for testing purposes.
 func (app *App) GetKey(storeKey string) *storetypes.KVStoreKey {
 	return app.keys[storeKey]
 }
 
 // GetTKey returns the TransientStoreKey for the provided store key.
-//
-// NOTE: This is solely to be used for testing purposes.
 func (app *App) GetTKey(storeKey string) *storetypes.TransientStoreKey {
 	return app.tkeys[storeKey]
 }
 
 // GetMemKey returns the MemStoreKey for the provided mem key.
-//
-// NOTE: This is solely used for testing purposes.
 func (app *App) GetMemKey(storeKey string) *storetypes.MemoryStoreKey {
 	return app.memKeys[storeKey]
 }
 
 // GetSubspace returns a param subspace for a given module name.
-//
-// NOTE: This is solely to be used for testing purposes.
 func (app *App) GetSubspace(moduleName string) paramstypes.Subspace {
 	subspace, _ := app.ParamsKeeper.GetSubspace(moduleName)
 	return subspace
@@ -947,15 +902,10 @@ func (app *App) SimulationManager() *module.SimulationManager {
 // API server.
 func (app *App) RegisterAPIRoutes(apiSvr *api.Server, apiConfig config.APIConfig) {
 	clientCtx := apiSvr.ClientCtx
-	// Register new tx routes from grpc-gateway.
 	authtx.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
-	// Register new tendermint queries routes from grpc-gateway.
 	tmservice.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
-
-	// Register grpc-gateway routes for all modules.
 	ModuleBasics.RegisterGRPCGatewayRoutes(clientCtx, apiSvr.GRPCGatewayRouter)
 
-	// register swagger API from root so that other applications can override easily
 	if apiConfig.Swagger {
 		RegisterSwaggerAPI(clientCtx, apiSvr.Router)
 	}
@@ -982,7 +932,6 @@ func RegisterSwaggerAPI(ctx client.Context, rtr *mux.Router) {
 	if err != nil {
 		panic(err)
 	}
-
 	staticServer := http.FileServer(statikFS)
 	rtr.PathPrefix("/swagger/").Handler(http.StripPrefix("/swagger/", staticServer))
 }
@@ -1032,17 +981,14 @@ func VerifyAddressFormat(bz []byte) error {
 			"invalid address length; got: %d, expect: %d", len(bz), AddrLen,
 		)
 	}
-
 	return nil
 }
 
 // Close will be called in graceful shutdown in start cmd
 func (app *App) Close() error {
 	err := app.BaseApp.Close()
-
 	if cms, ok := app.CommitMultiStore().(io.Closer); ok {
 		return errors.Join(err, cms.Close())
 	}
-
 	return err
 }
